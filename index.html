@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1014">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rodada">
+<title>Rodada · controle do bar</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>">
+<style>
+  :root{
+    --bg:#0e1014;
+    --surface:#171a21;
+    --surface-2:#20242d;
+    --border:#2e3440;
+    --text:#f3f4f6;      /* 16.6:1 no bg */
+    --muted:#a9b1bf;     /* ~8:1 no surface */
+    --accent:#ffb627;    /* ~10:1 no surface */
+    --accent-ink:#1a1200;
+    --danger:#ff8a8a;
+    --ok:#62d9a0;
+    --focus:#8ccbff;
+    --smoke:#b9a3ff;     /* ~8:1 no surface */
+    --smoke-ink:#160d33;
+    --smoke-bg:#1c1830;
+    --radius:16px;
+    --tap:48px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding:0 0 calc(32px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color:transparent;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+  .sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .num{font-variant-numeric:tabular-nums}
+  h1,h2,h3{margin:0;line-height:1.2}
+  button{font:inherit;color:inherit}
+  :focus{outline:none}
+  :focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:10px}
+
+  /* ---------- Header ---------- */
+  .app-header{
+    padding:calc(14px + env(safe-area-inset-top)) 0 4px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand-mark{
+    width:44px;height:44px;border-radius:12px;background:var(--accent);color:var(--accent-ink);
+    display:grid;place-items:center;font-size:1.5rem;flex-shrink:0;
+  }
+  .brand h1{font-size:clamp(1.3rem,5.5vw,1.75rem);font-weight:800;letter-spacing:-.02em}
+  .brand h1 span{color:var(--accent)}
+  .brand-sub{margin:2px 0 0;font-size:.85rem;color:var(--muted)}
+  .tabs{
+    display:flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    width:100%;
+  }
+  .tab{
+    flex:1;min-height:var(--tap);padding:0 18px;border:0;border-radius:10px;background:transparent;
+    color:var(--muted);font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+  @media (max-width:359px){ .brand-sub{display:none} }
+  @media (min-width:700px){
+    .wrap{max-width:720px;padding:0 24px}
+    .app-header{padding-top:28px;padding-bottom:8px}
+    .brand-mark{width:52px;height:52px;font-size:1.8rem}
+    .items{grid-template-columns:1fr 1fr}
+    .tabs{width:auto}
+    .kpis{grid-template-columns:repeat(4,1fr)}
+  }
+
+  /* ---------- Gráficos ---------- */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  @media (min-width:700px){ .kpis{grid-template-columns:repeat(4,1fr)} }
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+  .kpi-label{margin:0;font-size:.8rem;color:var(--muted)}
+  .kpi-value{margin:2px 0 0;font-size:1.4rem;font-weight:800}
+  .kpi-note{margin:2px 0 0;font-size:.75rem;color:var(--muted)}
+  .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-top:12px}
+  .chart-card h3{font-size:1rem}
+  .chart-card .chart-sub{margin:2px 0 8px;font-size:.8rem;color:var(--muted)}
+  .chart-wrap{position:relative}
+  .chart-wrap svg{display:block;width:100%;height:auto;overflow:visible}
+  .chart-wrap .hit{fill:transparent;cursor:pointer}
+  .chart-wrap .hit.is-active{fill:rgba(255,255,255,.06)}
+  .chart-wrap .hit:focus-visible{outline:none;stroke:var(--focus);stroke-width:2}
+  .ax{fill:var(--muted);font-size:11px;font-family:inherit}
+  .val{fill:var(--text);font-size:11px;font-weight:700;font-family:inherit}
+  .grid{stroke:var(--border);stroke-width:1}
+  .tip{
+    position:absolute;top:0;pointer-events:none;background:var(--text);color:var(--bg);
+    border-radius:10px;padding:8px 10px;font-size:.8rem;line-height:1.35;min-width:130px;
+    transform:translateX(-50%);box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:2;
+  }
+  .tip[hidden]{display:none}
+  .tip b{display:block;margin-bottom:2px}
+  .tip .row{display:flex;justify-content:space-between;gap:12px}
+  .tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 8px;padding:0;list-style:none;font-size:.8rem;color:var(--muted)}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .table-toggle{margin-top:10px;font-size:.85rem}
+  .table-toggle summary{cursor:pointer;color:var(--muted);min-height:var(--tap);display:flex;align-items:center}
+  .table-scroll{overflow-x:auto}
+  .data-table{border-collapse:collapse;width:100%;font-size:.8rem;white-space:nowrap}
+  .data-table th,.data-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right}
+  .data-table th:first-child,.data-table td:first-child{text-align:left}
+  .data-table th{color:var(--muted);font-weight:600}
+  .chart-empty{color:var(--muted);text-align:center;padding:28px 12px;border:1px dashed var(--border);border-radius:14px;margin-top:16px}
+
+  /* ---------- Resumo (sticky) ---------- */
+  .summary{
+    position:sticky;top:0;z-index:10;
+    background:linear-gradient(var(--bg) 85%,transparent);
+    padding:calc(12px + env(safe-area-inset-top)) 0 12px;
+  }
+  .summary-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .summary-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .total-label{font-size:.85rem;color:var(--muted);margin:0}
+  .total-value{font-size:2.4rem;font-weight:800;letter-spacing:-.02em;margin:2px 0 0}
+  .breakdown{display:flex;gap:16px;margin:8px 0 0;padding:0;font-size:.95rem}
+  .breakdown div{display:flex;flex-direction:column}
+  .breakdown dt{color:var(--muted);font-size:.8rem}
+  .breakdown dd{margin:0;font-weight:600}
+  .breakdown[hidden]{display:none}
+
+  .switch{
+    display:flex;align-items:center;gap:10px;min-height:var(--tap);
+    background:none;border:0;padding:4px 0;cursor:pointer;flex-shrink:0;
+  }
+  .switch-text{font-size:.85rem;color:var(--muted);text-align:right;line-height:1.2}
+  .switch-text strong{display:block;color:var(--text);font-size:.95rem}
+  .track{
+    width:56px;height:32px;border-radius:999px;background:var(--surface-2);
+    border:2px solid var(--muted);position:relative;transition:background .15s,border-color .15s;
+  }
+  .track::after{
+    content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:var(--muted);transition:transform .15s,background .15s;
+  }
+  .switch[aria-checked="true"] .track{background:var(--accent);border-color:var(--accent)}
+  .switch[aria-checked="true"] .track::after{transform:translateX(24px);background:var(--accent-ink)}
+
+  .chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .chip{
+    background:var(--surface-2);border:1px solid var(--border);border-radius:999px;
+    padding:6px 12px;font-size:.9rem;
+  }
+  .chip strong{font-weight:700}
+
+  /* ---------- Próximo da rodada ---------- */
+  .next{
+    margin:4px 0 16px;border:2px solid var(--accent);border-radius:var(--radius);
+    padding:14px 16px;background:linear-gradient(135deg,#2a2210,var(--surface) 60%);
+  }
+  .eyebrow{margin:0;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+  .next-row{display:flex;align-items:center;gap:12px;margin:6px 0 12px}
+  .next-emoji{font-size:2.2rem;line-height:1}
+  .next-name{font-size:1.25rem;font-weight:700}
+  .next-actions{display:flex;gap:10px}
+  .cycle-hint{margin:14px 0 6px;font-size:.8rem;color:var(--muted)}
+  .cycle{display:flex;gap:6px;margin:0;padding:0;list-style:none}
+  .cycle li{flex:1;display:flex}
+  .cycle button{
+    flex:1;min-height:var(--tap);border-radius:12px;background:var(--surface-2);cursor:pointer;
+    border:2px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:6px 2px;
+  }
+  .cycle .c-emoji{font-size:1.3rem;line-height:1}
+  .cycle .c-name{font-size:.7rem;color:var(--muted);line-height:1.1}
+  .cycle button[aria-pressed="true"]{border-color:var(--accent);background:#2e2612}
+  .cycle button[aria-pressed="true"] .c-name{color:var(--accent);font-weight:700}
+  .cycle button:active{transform:scale(.96)}
+
+  /* ---------- Botões ---------- */
+  .btn{
+    min-height:var(--tap);padding:0 18px;border-radius:12px;border:2px solid var(--border);
+    background:var(--surface-2);font-weight:700;cursor:pointer;font-size:1rem;
+  }
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);flex:1}
+  .btn.ghost{background:transparent}
+  .btn.danger{border-color:var(--danger);color:var(--danger);background:transparent}
+  .btn.block{width:100%}
+  .btn:active{transform:scale(.98)}
+
+  /* ---------- Cards ---------- */
+  .section-title{font-size:1rem;color:var(--muted);font-weight:600;margin:20px 0 10px}
+  .items{display:grid;gap:12px}
+  .card{
+    background:var(--surface);border:2px solid var(--border);border-radius:var(--radius);
+    padding:14px;transition:border-color .15s;
+  }
+  .card.is-next{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,182,39,.18)}
+  .card-head{display:flex;align-items:center;gap:10px}
+  .card-emoji{font-size:1.8rem;line-height:1}
+  .card-title{flex:1;min-width:0}
+  .card-title h3{font-size:1.05rem;font-weight:700}
+  .card-meta{font-size:.8rem;color:var(--muted)}
+  .badge{
+    display:none;margin-left:6px;vertical-align:middle;
+    background:var(--accent);color:var(--accent-ink);font-size:.72rem;font-weight:800;
+    padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;
+  }
+  .card.is-next .badge{display:inline-block}
+  .card-sub{text-align:right;font-size:.8rem;color:var(--muted)}
+  .card-sub strong{display:block;font-size:1.05rem;color:var(--text)}
+
+  /* Cigarro: cor própria, fora do ciclo */
+  .card.is-smoke{border-color:#3b3360;background:var(--smoke-bg)}
+  .card.is-smoke .card-meta{color:var(--smoke)}
+  .card.is-smoke .step.plus{background:var(--smoke);border-color:var(--smoke);color:var(--smoke-ink)}
+  .card.is-smoke .price-field{border-color:#3b3360}
+  .chip.is-smoke{border-color:#3b3360;background:var(--smoke-bg);color:var(--smoke)}
+  .chip.is-smoke strong{color:var(--text)}
+  .items-other{margin-top:12px}
+  @media (min-width:700px){ .items-other{grid-template-columns:1fr} }
+
+  .card-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:12px}
+  .price label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+  .price-field{
+    display:flex;align-items:center;height:var(--tap);border:2px solid var(--border);border-radius:12px;
+    background:var(--bg);padding:0 10px;width:120px;
+  }
+  .price-field:focus-within{border-color:var(--focus)}
+  .price-field span{color:var(--muted);margin-right:4px}
+  .price-field input{
+    width:100%;background:transparent;border:0;color:var(--text);font:inherit;font-size:16px;
+    font-weight:600;padding:0;
+  }
+  .price-field input:focus-visible{outline:none}
+  .price-field.is-invalid{border-color:var(--danger)}
+
+  .stepper{display:flex;align-items:center;gap:6px}
+  .step{
+    width:56px;height:56px;border-radius:14px;border:2px solid var(--border);
+    background:var(--surface-2);font-size:1.7rem;font-weight:700;cursor:pointer;line-height:1;
+  }
+  .step.plus{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+  .step:disabled{opacity:.35;cursor:not-allowed}
+  .qty{min-width:44px;text-align:center;font-size:1.5rem;font-weight:800}
+
+  /* ---------- Histórico ---------- */
+  .history-tools{display:flex;gap:10px;margin-bottom:8px}
+  .history-tools .btn{flex:1}
+  .history-hint{font-size:.85rem;color:var(--muted);margin:0 0 12px}
+  .history-sum{font-size:.9rem;color:var(--muted);margin:0 0 10px}
+  .history{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .h-item{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px}
+  .h-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .h-date{font-weight:600;text-transform:capitalize}
+  .h-total{font-weight:800;font-size:1.15rem}
+  .h-meta{font-size:.85rem;color:var(--muted);margin-top:4px}
+  .empty{color:var(--muted);text-align:center;padding:20px;border:1px dashed var(--border);border-radius:14px}
+
+  /* ---------- Avisos ---------- */
+  .alert{
+    margin:12px 0 0;padding:10px 14px;border-radius:12px;border:1px solid var(--danger);
+    color:var(--danger);background:#2a1414;font-size:.9rem;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
+    background:var(--text);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:600;
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .foot{color:var(--muted);font-size:.8rem;text-align:center;margin-top:24px}
+
+  /* ---------- Dialog ---------- */
+  dialog{
+    background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:20px;
+    padding:20px;width:min(92vw,420px);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.7)}
+  dialog h2{font-size:1.25rem;margin-bottom:12px}
+  .dlg-list{margin:0 0 16px;padding:0;display:grid;gap:6px}
+  .dlg-list div{display:flex;justify-content:space-between}
+  .dlg-list dt{color:var(--muted)}
+  .dlg-list dd{margin:0;font-weight:700}
+  .dlg-list .grand dd{font-size:1.2rem;color:var(--accent)}
+  .dlg-actions{display:flex;gap:10px}
+  .dlg-actions .btn{flex:1}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="app-header" role="banner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🍻</span>
+      <div>
+        <h1>Thiago <span>no Bar</span></h1>
+        <p class="brand-sub" id="todayLabel"></p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <button class="tab" role="tab" id="tab-noite" aria-controls="panel-noite" aria-selected="true">🍺 Noite</button>
+      <button class="tab" role="tab" id="tab-hist" aria-controls="panel-hist" aria-selected="false" tabindex="-1">📊 Histórico</button>
+    </nav>
+  </div>
+
+  <div id="storageAlert" class="alert" role="alert" hidden>
+    Não foi possível salvar no navegador (modo privado ou armazenamento cheio). Os dados valem só enquanto a página estiver aberta.
+  </div>
+
+  <main>
+  <section id="panel-noite" role="tabpanel" aria-labelledby="tab-noite">
+  <!-- Resumo -->
+  <section class="summary" aria-label="Resumo da conta">
+    <div class="summary-card">
+      <div class="summary-top">
+        <div aria-live="polite" aria-atomic="true">
+          <p class="total-label" id="totalLabel">Total a pagar</p>
+          <p class="total-value num" id="totalValue">R$ 0,00</p>
+        </div>
+        <button class="switch" id="serviceToggle" role="switch" aria-checked="true" aria-labelledby="serviceLabel">
+          <span class="switch-text" id="serviceLabel">Serviço<strong>10%</strong></span>
+          <span class="track" aria-hidden="true"></span>
+        </button>
+      </div>
+      <dl class="breakdown num" id="breakdown">
+        <div><dt>Subtotal</dt><dd id="subtotalValue">R$ 0,00</dd></div>
+        <div><dt>Serviço (10%)</dt><dd id="serviceValue">R$ 0,00</dd></div>
+      </dl>
+      <div class="chips num">
+        <span class="chip">🍹 <strong id="drinkCount">0</strong> bebidas</span>
+        <span class="chip is-smoke">🚬 <strong id="cigCount">0</strong> cigarros</span>
+      </div>
+    </div>
+  </section>
+
+    <!-- Próximo da rodada -->
+    <section class="next" aria-labelledby="nextTitle">
+      <h2 class="eyebrow" id="nextTitle">Próximo da rodada</h2>
+      <div class="next-row">
+        <span class="next-emoji" id="nextEmoji" aria-hidden="true">🍺</span>
+        <span class="next-name" id="nextName">Cerveja long neck</span>
+      </div>
+      <div class="next-actions">
+        <button class="btn primary" id="nextAdd">+ Adicionar</button>
+        <button class="btn ghost" id="nextSkip">Pular</button>
+      </div>
+      <p class="cycle-hint" id="cycleHint">Toque num ícone para trocar o próximo</p>
+      <ol class="cycle" id="cycleStrip" aria-labelledby="cycleHint"></ol>
+    </section>
+
+    <!-- Itens -->
+    <h2 class="section-title">Bebidas da noite</h2>
+    <div class="items" id="items"></div>
+    <h2 class="section-title">Fora do ciclo</h2>
+    <div class="items items-other" id="itemsOther"></div>
+
+    <div style="margin-top:20px">
+      <button class="btn danger block" id="closeNight">Encerrar noite e salvar</button>
+    </div>
+
+  </section>
+
+  <!-- ================= Histórico ================= -->
+  <section id="panel-hist" role="tabpanel" aria-labelledby="tab-hist" hidden>
+    <div id="chartsEmpty" class="chart-empty" hidden>Salve pelo menos uma noite para ver os gráficos.</div>
+    <div id="chartsArea">
+      <div class="kpis num">
+        <div class="kpi"><p class="kpi-label">Noites</p><p class="kpi-value" id="kNights">0</p></div>
+        <div class="kpi"><p class="kpi-label">Gasto médio</p><p class="kpi-value" id="kAvg">R$ 0,00</p><p class="kpi-note">por noite</p></div>
+        <div class="kpi"><p class="kpi-label">Bebidas</p><p class="kpi-value" id="kDrinks">0</p><p class="kpi-note">média por noite</p></div>
+        <div class="kpi"><p class="kpi-label">Com álcool</p><p class="kpi-value" id="kAlc">0%</p><p class="kpi-note">das bebidas · ciclo ideal 25%</p></div>
+      </div>
+
+      <div class="chart-card">
+        <h3 id="c1Title">Valor por noite</h3>
+        <p class="chart-sub" id="c1Sub">Total pago · últimas noites</p>
+        <div class="chart-wrap" id="chartValue"></div>
+      </div>
+
+      <div class="chart-card">
+        <h3 id="c2Title">Bebidas e cigarros por noite</h3>
+        <p class="chart-sub">Quantidade · toque numa coluna para ver o detalhe</p>
+        <ul class="legend" id="legend"></ul>
+        <div class="chart-wrap" id="chartQty"></div>
+      </div>
+
+      <details class="table-toggle">
+        <summary>Ver dados em tabela</summary>
+        <div class="table-scroll"><table class="data-table num" id="dataTable"></table></div>
+      </details>
+    </div>
+
+    <h2 class="section-title">Noites salvas</h2>
+    <div class="history-tools">
+      <button class="btn" id="exportBtn">Exportar JSON</button>
+      <button class="btn" id="importBtn">Importar JSON</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+    <p class="history-hint" id="exportHint">Exportar grava o JSON na pasta historico do projeto. Na primeira vez, escolha essa pasta.</p>
+    <p class="history-sum num" id="historySum"></p>
+    <ul class="history" id="history"></ul>
+
+    <p class="foot">A noite fica neste navegador. Exportar grava uma cópia na pasta historico, que sobe junto para o GitHub.</p>
+  </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="confirmDlg" aria-labelledby="dlgTitle">
+  <form method="dialog">
+    <h2 id="dlgTitle">Encerrar a noite?</h2>
+    <dl class="dlg-list num" id="dlgList"></dl>
+    <p style="color:var(--muted);font-size:.9rem;margin:0 0 16px">Os contadores serão zerados. Os preços continuam salvos.</p>
+    <div class="dlg-actions">
+      <button class="btn ghost" value="cancel">Cancelar</button>
+      <button class="btn primary" value="ok">Encerrar e salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Config ---------- */
+  const ITEMS = [
+    { id:'longneck', emoji:'🍺', name:'Cerveja long neck',            price:1200, cycle:true },
+    { id:'aguagas',  emoji:'🍋', name:'Água com gás, gelo e limão',   price:700,  cycle:true },
+    { id:'zero',     emoji:'🥤', name:'Cerveja zero álcool',          price:1000, cycle:true },
+    { id:'agua',     emoji:'💧', name:'Água',                         price:500,  cycle:true },
+    { id:'cigarro',  emoji:'🚬', name:'Cigarro',                      price:150,  cycle:false }
+  ];
+  const CYCLE = ITEMS.filter(i => i.cycle).map(i => i.id);
+  const BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+  const KEY = 'rodada:v1';
+  const SERVICE_RATE = 0.10;
+
+  /* Valores sempre em centavos (inteiros) para evitar erro de ponto flutuante */
+  const brl = new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' });
+  const money = c => brl.format((c || 0) / 100);
+  const plain = c => ((c || 0) / 100).toFixed(2).replace('.', ',');
+  const dFmt = new Intl.DateTimeFormat('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
+  const shortD = new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit' });
+  const longD = new Intl.DateTimeFormat('pt-BR', { weekday:'long', day:'numeric', month:'long' });
+  /* A "data da noite" é a do primeiro item pedido: quem fecha depois da meia-noite não troca de dia */
+  const nightDate = h => new Date(h.startedAt || h.date);
+
+  /* ---------- Estado + storage ---------- */
+  const defaults = () => ({
+    v: 1,
+    prices: Object.fromEntries(ITEMS.map(i => [i.id, i.price])),
+    counts: Object.fromEntries(ITEMS.map(i => [i.id, 0])),
+    next: 0,
+    service: true,
+    startedAt: null,
+    history: []
+  });
+
+  let storageOk = true;
+
+  function load() {
+    const base = defaults();
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return base;
+      const d = JSON.parse(raw);
+      for (const i of ITEMS) {
+        if (Number.isInteger(d?.prices?.[i.id]) && d.prices[i.id] >= 0) base.prices[i.id] = d.prices[i.id];
+        if (Number.isInteger(d?.counts?.[i.id]) && d.counts[i.id] >= 0) base.counts[i.id] = d.counts[i.id];
+      }
+      if (Number.isInteger(d.next)) base.next = ((d.next % CYCLE.length) + CYCLE.length) % CYCLE.length;
+      if (typeof d.service === 'boolean') base.service = d.service;
+      if (d.startedAt) base.startedAt = d.startedAt;
+      if (Array.isArray(d.history)) base.history = d.history.map(normEntry).filter(Boolean);
+      return base;
+    } catch (e) {
+      storageFail(e);
+      return base;
+    }
+  }
+
+  function persist() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(s));
+      if (!storageOk) { storageOk = true; $('storageAlert').hidden = true; }
+    } catch (e) {
+      storageFail(e);
+    }
+  }
+
+  function storageFail(e) {
+    storageOk = false;
+    console.warn('localStorage indisponível:', e);
+    const el = document.getElementById('storageAlert');
+    if (el) el.hidden = false;
+  }
+
+  /* ---------- Helpers ---------- */
+  const $ = id => document.getElementById(id);
+
+  function parsePrice(str) {
+    let t = String(str).replace(/R\$|\s/g, '');
+    if (!t) return null;
+    if (t.includes(',') && t.includes('.')) t = t.replace(/\./g, '').replace(',', '.');
+    else t = t.replace(',', '.');
+    if (!/^\d*\.?\d*$/.test(t)) return null;
+    const n = parseFloat(t);
+    if (!Number.isFinite(n) || n < 0 || n > 100000) return null;
+    return Math.round(n * 100);
+  }
+
+  function totals() {
+    let subtotal = 0, drinks = 0, cigs = 0;
+    for (const i of ITEMS) {
+      const q = s.counts[i.id];
+      subtotal += q * s.prices[i.id];
+      if (i.cycle) drinks += q; else cigs += q;
+    }
+    const serviceValue = s.service ? Math.round(subtotal * SERVICE_RATE) : 0;
+    return { subtotal, serviceValue, total: subtotal + serviceValue, drinks, cigs };
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  const buzz = () => { try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} };
+
+  /* ---------- UI: construir cards uma vez ---------- */
+  const refs = {};
+
+  function buildItems() {
+    for (const i of ITEMS) {
+      const wrap = i.cycle ? $('items') : $('itemsOther');
+      const card = document.createElement('article');
+      card.className = i.cycle ? 'card' : 'card is-smoke';
+      card.setAttribute('aria-labelledby', `t-${i.id}`);
+      card.innerHTML = `
+        <div class="card-head">
+          <span class="card-emoji" aria-hidden="true">${i.emoji}</span>
+          <div class="card-title">
+            <h3 id="t-${i.id}">${i.name}<span class="badge">Próximo</span></h3>
+            <div class="card-meta">${i.cycle ? `${CYCLE.indexOf(i.id) + 1}º no ciclo` : 'Fora do ciclo'}</div>
+          </div>
+          <div class="card-sub num">Subtotal<strong data-sub>R$ 0,00</strong></div>
+        </div>
+        <div class="card-row">
+          <div class="price">
+            <label for="p-${i.id}">Preço unitário</label>
+            <div class="price-field">
+              <span aria-hidden="true">R$</span>
+              <input id="p-${i.id}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done"
+                     aria-describedby="t-${i.id}" class="num">
+            </div>
+          </div>
+          <div class="stepper">
+            <button class="step minus" type="button" aria-label="Remover 1 ${i.name}">−</button>
+            <output class="qty num" aria-label="Quantidade de ${i.name}">0</output>
+            <button class="step plus" type="button" aria-label="Adicionar 1 ${i.name}">+</button>
+          </div>
+        </div>`;
+      wrap.appendChild(card);
+
+      const input = card.querySelector('input');
+      const field = card.querySelector('.price-field');
+      input.value = plain(s.prices[i.id]);
+
+      input.addEventListener('focus', () => input.select());
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+      input.addEventListener('input', () => field.classList.toggle('is-invalid', parsePrice(input.value) === null));
+      input.addEventListener('change', () => {
+        const v = parsePrice(input.value);
+        if (v === null) {
+          input.value = plain(s.prices[i.id]);
+          field.classList.remove('is-invalid');
+          toast('Preço inválido. Use, por exemplo, 12,50');
+          return;
+        }
+        s.prices[i.id] = v;
+        input.value = plain(v);
+        field.classList.remove('is-invalid');
+        persist(); render();
+      });
+
+      card.querySelector('.plus').addEventListener('click', () => inc(i.id));
+      card.querySelector('.minus').addEventListener('click', () => dec(i.id));
+
+      refs[i.id] = {
+        card, input,
+        sub: card.querySelector('[data-sub]'),
+        qty: card.querySelector('.qty'),
+        minus: card.querySelector('.minus')
+      };
+    }
+
+    const strip = $('cycleStrip');
+    const SHORT = { longneck:'Long neck', aguagas:'Com gás', zero:'Zero', agua:'Água' };
+    CYCLE.forEach((id, idx) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', `Definir próximo: ${BY_ID[id].name}`);
+      b.innerHTML = `<span class="c-emoji" aria-hidden="true">${BY_ID[id].emoji}</span><span class="c-name">${SHORT[id]}</span>`;
+      b.addEventListener('click', () => setNext(idx));
+      li.appendChild(b);
+      strip.appendChild(li);
+    });
+  }
+
+  /* ---------- Ações ---------- */
+  function inc(id) {
+    s.counts[id]++;
+    if (!s.startedAt) s.startedAt = new Date().toISOString();
+    const ci = CYCLE.indexOf(id);
+    if (ci > -1) s.next = (ci + 1) % CYCLE.length;   // ciclo segue a partir do que você pediu
+    buzz(); persist(); render();
+  }
+
+  function dec(id) {
+    if (s.counts[id] <= 0) return;
+    s.counts[id]--;
+    persist(); render();
+  }
+
+  function setNext(idx) {
+    if (idx === s.next) return;
+    s.next = idx;
+    buzz(); persist(); render();
+    toast(`Próximo: ${BY_ID[CYCLE[idx]].name}`);
+  }
+
+  function skip() {
+    s.next = (s.next + 1) % CYCLE.length;
+    persist(); render();
+    toast(`Próximo: ${BY_ID[CYCLE[s.next]].name}`);
+  }
+
+  function toggleService() {
+    s.service = !s.service;
+    persist(); render();
+  }
+
+  function closeNight() {
+    const t = totals();
+    if (t.drinks + t.cigs === 0) { toast('Nada para salvar ainda'); return; }
+
+    $('dlgList').innerHTML = `
+      <div><dt>Subtotal</dt><dd>${money(t.subtotal)}</dd></div>
+      <div><dt>Serviço (10%)</dt><dd>${s.service ? money(t.serviceValue) : 'Não incluído'}</dd></div>
+      <div><dt>Bebidas</dt><dd>${t.drinks}</dd></div>
+      <div><dt>Cigarros</dt><dd>${t.cigs}</dd></div>
+      <div class="grand"><dt>Total a pagar</dt><dd>${money(t.total)}</dd></div>`;
+
+    const dlg = $('confirmDlg');
+    if (typeof dlg.showModal !== 'function') {
+      if (confirm(`Encerrar a noite? Total: ${money(t.total)}`)) commitNight();
+      return;
+    }
+    dlg.returnValue = '';
+    dlg.showModal();
+    dlg.addEventListener('close', function onClose() {
+      dlg.removeEventListener('close', onClose);
+      if (dlg.returnValue === 'ok') commitNight();
+      $('closeNight').focus();
+    });
+  }
+
+  function commitNight() {
+    const t = totals();
+    const now = new Date();
+    s.history.push({
+      id: now.getTime().toString(36) + Math.random().toString(36).slice(2, 6),
+      date: now.toISOString(),
+      startedAt: s.startedAt,
+      subtotal: t.subtotal,
+      service: s.service,
+      serviceValue: t.serviceValue,
+      total: t.total,
+      drinks: t.drinks,
+      cigs: t.cigs,
+      items: { ...s.counts }
+    });
+    for (const i of ITEMS) s.counts[i.id] = 0;
+    s.next = 0;
+    s.startedAt = null;
+    persist(); render();
+    toast(`Noite salva: ${money(t.total)}`);
+  }
+
+  /* ---------- Export / Import ----------
+     Cada exportação é um snapshot completo (preços + noites).
+     O arquivo vai para a pasta historico/ e o manifest.json lista os nomes,
+     para o GitHub Pages conseguir ler a pasta (não há listagem de diretório). */
+  const HIST_DIR_DB = 'rodada-fs';
+  const HIST_RE = /^rodada-historico-\d{4}-\d{2}-\d{2}-\d{6}\.json$/;
+
+  function exportPayload() {
+    return {
+      app: 'rodada', version: 1, exportedAt: new Date().toISOString(),
+      currency: 'BRL', amountsIn: 'centavos',
+      prices: s.prices, history: s.history
+    };
+  }
+
+  function exportFileName(date = new Date()) {
+    const p = n => String(n).padStart(2, '0');
+    return `rodada-historico-${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}.json`;
+  }
+
+  function openHandleDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(HIST_DIR_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('kv');
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function readDirHandle() {
+    try {
+      const db = await openHandleDb();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction('kv', 'readonly');
+        const r = tx.objectStore('kv').get('historico');
+        r.onsuccess = () => resolve(r.result || null);
+        r.onerror = () => reject(r.error);
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function storeDirHandle(handle) {
+    const db = await openHandleDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(handle, 'historico');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async function ensureHistoricoDir() {
+    if (typeof window.showDirectoryPicker !== 'function') throw new Error('sem-api');
+    let handle = await readDirHandle();
+    if (handle) {
+      let perm = 'prompt';
+      try { perm = await handle.queryPermission({ mode: 'readwrite' }); } catch (_) {}
+      if (perm !== 'granted') {
+        try { perm = await handle.requestPermission({ mode: 'readwrite' }); } catch (_) { perm = 'denied'; }
+      }
+      if (perm === 'granted') return handle;
+    }
+    handle = await window.showDirectoryPicker({ id: 'rodada-historico', mode: 'readwrite' });
+    try { await storeDirHandle(handle); } catch (e) { console.warn('Não foi possível lembrar a pasta historico:', e); }
+    return handle;
+  }
+
+  async function writeTextFile(dir, name, text) {
+    const fh = await dir.getFileHandle(name, { create: true });
+    const writable = await fh.createWritable();
+    await writable.write(text);
+    await writable.close();
+  }
+
+  async function listExportNames(dir) {
+    const names = [];
+    for await (const [name, handle] of dir.entries()) {
+      if (handle.kind === 'file' && HIST_RE.test(name)) names.push(name);
+    }
+    names.sort();
+    return names;
+  }
+
+  async function writeExportToDir(dir, fileName, jsonText) {
+    await writeTextFile(dir, fileName, jsonText);
+    const files = await listExportNames(dir);
+    if (!files.includes(fileName)) files.push(fileName);
+    await writeTextFile(dir, 'manifest.json', JSON.stringify({ folder: 'historico', files }, null, 2) + '\n');
+  }
+
+  function downloadFallback(jsonText, fileName) {
+    const blob = new Blob([jsonText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function refreshExportHint() {
+    const hint = $('exportHint');
+    if (!hint) return;
+    if (typeof window.showDirectoryPicker !== 'function') {
+      hint.textContent = 'Este navegador baixa o JSON. Coloque o arquivo na pasta historico e inclua o nome em manifest.json.';
+      return;
+    }
+    const dir = await readDirHandle();
+    if (!dir) {
+      hint.textContent = 'Exportar grava o JSON na pasta historico do projeto. Na primeira vez, escolha essa pasta.';
+      return;
+    }
+    let perm = 'prompt';
+    try { perm = await dir.queryPermission({ mode: 'readwrite' }); } catch (_) {}
+    hint.textContent = perm === 'granted'
+      ? `Pasta ligada (${dir.name}). Exportar grava o JSON aí e atualiza o manifest.json.`
+      : 'Exportar grava o JSON na pasta historico. Confirme o acesso quando o navegador pedir.';
+  }
+
+  async function exportJSON() {
+    const fileName = exportFileName();
+    const jsonText = JSON.stringify(exportPayload(), null, 2) + '\n';
+    try {
+      const dir = await ensureHistoricoDir();
+      await writeExportToDir(dir, fileName, jsonText);
+      toast(dir.name === 'historico'
+        ? `Salvo em historico/${fileName}`
+        : `Salvo em ${dir.name}/${fileName}. O ideal é a pasta historico do projeto.`);
+      refreshExportHint();
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      console.warn('Exportar na pasta historico falhou:', e);
+    }
+    try {
+      downloadFallback(jsonText, fileName);
+      toast('Arquivo baixado. Mova para a pasta historico e coloque o nome em manifest.json.');
+    } catch (_) {
+      toast('Não foi possível exportar');
+    }
+  }
+
+  function mergeHistoryList(list) {
+    const known = new Set(s.history.map(h => h.id));
+    let added = 0;
+    for (const raw of list) {
+      const e = normEntry(raw);
+      if (!e || known.has(e.id)) continue;
+      s.history.push(e);
+      known.add(e.id);
+      added++;
+    }
+    return added;
+  }
+
+  function mergeExportData(data) {
+    const list = Array.isArray(data) ? data : data && data.history;
+    if (!Array.isArray(list)) return 0;
+    return mergeHistoryList(list);
+  }
+
+  async function loadCommittedHistory() {
+    try {
+      const res = await fetch('historico/manifest.json', { cache: 'no-store' });
+      if (!res.ok) return 0;
+      const manifest = await res.json();
+      const files = Array.isArray(manifest.files) ? manifest.files : [];
+      let added = 0;
+      for (const name of files) {
+        if (!HIST_RE.test(name)) continue;
+        const r = await fetch(`historico/${encodeURIComponent(name)}`, { cache: 'no-store' });
+        if (!r.ok) continue;
+        added += mergeExportData(await r.json());
+      }
+      return added;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  async function loadGrantedDirHistory() {
+    try {
+      const dir = await readDirHandle();
+      if (!dir) return 0;
+      const perm = await dir.queryPermission({ mode: 'read' });
+      if (perm !== 'granted') return 0;
+      let added = 0;
+      for (const name of await listExportNames(dir)) {
+        const fh = await dir.getFileHandle(name);
+        const file = await fh.getFile();
+        added += mergeExportData(JSON.parse(await file.text()));
+      }
+      return added;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  async function hydrateFromHistorico() {
+    const added = (await loadCommittedHistory()) + (await loadGrantedDirHistory());
+    if (added > 0) {
+      persist();
+      render();
+    }
+  }
+
+  function normEntry(e) {
+    if (!e || typeof e !== 'object') return null;
+    const d = new Date(e.date);
+    if (isNaN(d)) return null;
+    const int = x => (Number.isFinite(+x) ? Math.max(0, Math.round(+x)) : 0);
+    const subtotal = int(e.subtotal);
+    const items = {};
+    if (e.items && typeof e.items === 'object') for (const i of ITEMS) items[i.id] = int(e.items[i.id]);
+    const st = e.startedAt ? new Date(e.startedAt) : null;
+    return {
+      id: String(e.id || `${d.getTime().toString(36)}-${int(e.total)}`).slice(0, 40),
+      date: d.toISOString(),
+      startedAt: st && !isNaN(st) ? st.toISOString() : null,
+      subtotal,
+      service: !!e.service,
+      serviceValue: int(e.serviceValue),
+      total: int(e.total) || subtotal,
+      drinks: int(e.drinks),
+      cigs: int(e.cigs),
+      items
+    };
+  }
+
+  function importJSON(file) {
+    const reader = new FileReader();
+    reader.onerror = () => toast('Não foi possível ler o arquivo');
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        const list = Array.isArray(data) ? data : data.history;
+        if (!Array.isArray(list)) throw new Error('formato');
+        const known = new Set(s.history.map(h => h.id));
+        let added = 0, dup = 0, bad = 0;
+        for (const raw of list) {
+          const e = normEntry(raw);
+          if (!e) { bad++; continue; }
+          if (known.has(e.id)) { dup++; continue; }
+          s.history.push(e); known.add(e.id); added++;
+        }
+        if (data && data.prices && typeof data.prices === 'object' &&
+            confirm('O arquivo também tem preços. Substituir os preços atuais?')) {
+          for (const i of ITEMS) {
+            const p = data.prices[i.id];
+            if (Number.isInteger(p) && p >= 0) { s.prices[i.id] = p; refs[i.id].input.value = plain(p); }
+          }
+        }
+        persist(); render();
+        toast(`${added} noite(s) importada(s)` + (dup ? ` · ${dup} já existia(m)` : '') + (bad ? ` · ${bad} inválida(s)` : ''));
+      } catch (e) {
+        toast('Arquivo inválido. Use um JSON exportado pelo app.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /* ---------- Render ---------- */
+  function render() {
+    const t = totals();
+
+    $('totalLabel').textContent = s.service ? 'Total a pagar (com 10%)' : 'Total a pagar (sem 10%)';
+    $('totalValue').textContent = money(t.total);
+    $('subtotalValue').textContent = money(t.subtotal);
+    $('serviceValue').textContent = money(t.serviceValue);
+    $('breakdown').hidden = !s.service;
+    $('serviceToggle').setAttribute('aria-checked', String(s.service));
+    $('drinkCount').textContent = t.drinks;
+    $('cigCount').textContent = t.cigs;
+
+    const nextId = CYCLE[s.next];
+    const next = BY_ID[nextId];
+    $('nextEmoji').textContent = next.emoji;
+    $('nextName').textContent = next.name;
+    $('nextAdd').setAttribute('aria-label', `Adicionar 1 ${next.name}`);
+    [...$('cycleStrip').querySelectorAll('button')].forEach((b, idx) => b.setAttribute('aria-pressed', String(idx === s.next)));
+
+
+    for (const i of ITEMS) {
+      const r = refs[i.id];
+      const q = s.counts[i.id];
+      r.qty.textContent = q;
+      r.sub.textContent = money(q * s.prices[i.id]);
+      r.minus.disabled = q === 0;
+      r.card.classList.toggle('is-next', i.id === nextId);
+    }
+
+    renderHistory();
+    if (!$('panel-hist').hidden) renderCharts();
+  }
+
+  function renderHistory() {
+    const ul = $('history');
+    ul.replaceChildren();
+    const list = [...s.history].sort((a, b) => nightDate(b) - nightDate(a));
+
+    if (!list.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Nenhuma noite salva ainda.';
+      ul.appendChild(li);
+      $('historySum').textContent = '';
+      return;
+    }
+
+    const sum = list.reduce((acc, h) => acc + h.total, 0);
+    $('historySum').textContent = `${list.length} noite(s) · ${money(sum)} no total · média ${money(Math.round(sum / list.length))}`;
+
+    for (const h of list) {
+      const li = document.createElement('li');
+      li.className = 'h-item';
+
+      const top = document.createElement('div');
+      top.className = 'h-top';
+      const date = document.createElement('span');
+      date.className = 'h-date';
+      date.textContent = dFmt.format(nightDate(h));
+      const total = document.createElement('span');
+      total.className = 'h-total num';
+      total.textContent = money(h.total);
+      top.append(date, total);
+
+      const meta = document.createElement('div');
+      meta.className = 'h-meta num';
+      meta.textContent =
+        `Subtotal ${money(h.subtotal)} · ${h.service ? `com 10% (${money(h.serviceValue)})` : 'sem 10%'}` +
+        ` · 🍹 ${h.drinks} bebida(s) · 🚬 ${h.cigs} cigarro(s)`;
+
+      li.append(top, meta);
+      ul.appendChild(li);
+    }
+  }
+
+
+  /* ---------- Abas ---------- */
+  const TABS = ['noite', 'hist'];
+  function showTab(name, focus) {
+    for (const t of TABS) {
+      const on = t === name;
+      const tab = $(`tab-${t}`);
+      tab.setAttribute('aria-selected', String(on));
+      tab.tabIndex = on ? 0 : -1;
+      $(`panel-${t}`).hidden = !on;
+      if (on && focus) tab.focus();
+    }
+    if (name === 'hist') { renderCharts(); refreshExportHint(); }
+    window.scrollTo({ top: 0 });
+  }
+  TABS.forEach((t, idx) => {
+    const tab = $(`tab-${t}`);
+    tab.addEventListener('click', () => showTab(t));
+    tab.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      showTab(TABS[(idx + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length], true);
+    });
+  });
+
+  /* ---------- Gráficos (SVG puro) ----------
+     Cores validadas para o fundo escuro (CVD e visão normal, ordem adjacente):
+     cigarro (violeta) ao lado da long neck, pilha amarelo → verde-água → laranja → azul */
+  const NS = 'http://www.w3.org/2000/svg';
+  const MAX_NIGHTS = 10;
+  const STACK = [
+    { id:'longneck', label:'Long neck',   color:'#c98500' },
+    { id:'aguagas',  label:'Água c/ gás', color:'#199e70' },
+    { id:'zero',     label:'Zero',        color:'#d95926' },
+    { id:'agua',     label:'Água',        color:'#3987e5' }
+  ];
+  const CIG = { id:'cigarro', label:'Cigarros', color:'#9085e9' };
+  const UNKNOWN = { id:'_semdetalhe', label:'Sem detalhe', color:'#5b6170' };
+  const VALUE_COLOR = '#ffb627';
+
+  const svg = (tag, attrs = {}) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+  const topRound = (x, y, w, h, r) => {
+    r = Math.max(0, Math.min(r, w / 2, h));
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  };
+  const niceMax = v => {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    const n = v / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+  };
+
+  function chartNights() {
+    return [...s.history].sort((a, b) => nightDate(a) - nightDate(b)).slice(-MAX_NIGHTS).map(h => {
+      const items = h.items || {};
+      const detailed = STACK.reduce((a, x) => a + (items[x.id] || 0), 0);
+      return { ...h, items, unknown: Math.max(0, h.drinks - detailed), label: shortD.format(nightDate(h)) };
+    });
+  }
+
+  let activeTip = null;
+  function hideTips() {
+    document.querySelectorAll('.chart-wrap .tip').forEach(t => (t.hidden = true));
+    document.querySelectorAll('.chart-wrap .hit.is-active').forEach(r => r.classList.remove('is-active'));
+    activeTip = null;
+  }
+
+  /* Monta eixos + colunas; drawCol desenha as marcas de cada noite */
+  function drawChart(host, data, { yMax, yFmt, drawCol, tipHtml, ariaLabel }) {
+    host.replaceChildren();
+    const W = Math.max(280, host.clientWidth || 320);
+    const H = 200, m = { t: 18, r: 6, b: 26, l: 46 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': ariaLabel });
+    const y = v => m.t + ph - (v / yMax) * ph;
+
+    [0, yMax / 2, yMax].forEach(v => {
+      root.appendChild(svg('line', { class: 'grid', x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }));
+      const t = svg('text', { class: 'ax', x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end' });
+      t.textContent = yFmt(v);
+      root.appendChild(t);
+    });
+
+    const band = pw / data.length;
+    const every = band >= 36 ? 1 : 2;
+    const tip = document.createElement('div');
+    tip.className = 'tip'; tip.hidden = true; tip.setAttribute('aria-hidden', 'true');
+
+    data.forEach((d, i) => {
+      const cx = m.l + band * i + band / 2;
+      const hit = svg('rect', { class: 'hit', x: m.l + band * i, y: m.t, width: band, height: ph, rx: 6, tabindex: 0, role: 'button' });
+      hit.setAttribute('aria-label', tipHtml(d).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+      root.appendChild(hit);
+      const g = svg('g', { 'pointer-events': 'none' });
+      drawCol(g, d, cx, band, y, m.t + ph, i === data.length - 1);
+      root.appendChild(g);
+
+      if (i % every === 0 || i === data.length - 1) {
+        const t = svg('text', { class: 'ax', x: cx, y: H - 8, 'text-anchor': 'middle' });
+        t.textContent = d.label;
+        root.appendChild(t);
+      }
+
+      const show = () => {
+        hideTips();
+        hit.classList.add('is-active');
+        tip.innerHTML = tipHtml(d);
+        tip.hidden = false;
+        const half = 75;
+        tip.style.left = `${Math.min(W - half, Math.max(half, cx))}px`;
+        activeTip = tip;
+      };
+      hit.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') show(); });
+      hit.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hideTips(); });
+      hit.addEventListener('click', e => { e.stopPropagation(); show(); });
+      hit.addEventListener('focus', show);
+      hit.addEventListener('blur', hideTips);
+      hit.addEventListener('keydown', e => { if (e.key === 'Escape') hideTips(); });
+    });
+
+    host.append(root, tip);
+  }
+
+  function renderCharts() {
+    const all = s.history;
+    const empty = all.length === 0;
+    $('chartsEmpty').hidden = !empty;
+    $('chartsArea').hidden = empty;
+    if (empty) return;
+
+    /* KPIs (todas as noites) */
+    const sum = all.reduce((a, h) => a + h.total, 0);
+    const drinks = all.reduce((a, h) => a + h.drinks, 0);
+    const detailed = all.filter(h => h.items && STACK.some(x => h.items[x.id]));
+    const alc = detailed.reduce((a, h) => a + (h.items.longneck || 0), 0);
+    const detDrinks = detailed.reduce((a, h) => a + STACK.reduce((b, x) => b + (h.items[x.id] || 0), 0), 0);
+    $('kNights').textContent = all.length;
+    $('kAvg').textContent = money(Math.round(sum / all.length));
+    $('kDrinks').textContent = (drinks / all.length).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    $('kAlc').textContent = detDrinks ? `${Math.round((alc / detDrinks) * 100)}%` : '—';
+
+    const data = chartNights();
+    $('c1Sub').textContent = `Total pago · últimas ${data.length} noite(s)`;
+    const hasUnknown = data.some(d => d.unknown > 0);
+    const series = [CIG, ...STACK, ...(hasUnknown ? [UNKNOWN] : [])];
+
+    /* Legenda */
+    $('legend').replaceChildren(...series.map(sr => {
+      const li = document.createElement('li');
+      li.innerHTML = `<i style="background:${sr.color}" aria-hidden="true"></i>${sr.label}`;
+      return li;
+    }));
+
+    /* 1) Valor por noite — série única, rótulo só na noite mais recente */
+    const vMax = niceMax(Math.max(...data.map(d => d.total)));
+    drawChart($('chartValue'), data, {
+      yMax: vMax,
+      yFmt: v => `R$ ${Math.round(v / 100)}`,
+      ariaLabel: `Valor por noite, ${data.length} noites. Detalhes na tabela abaixo.`,
+      tipHtml: d => `<b>${dFmt.format(nightDate(d))}</b>
+        <div class="row"><span>Total</span><span>${money(d.total)}</span></div>
+        <div class="row"><span>Subtotal</span><span>${money(d.subtotal)}</span></div>
+        <div class="row"><span>Serviço</span><span>${d.service ? money(d.serviceValue) : 'não incluído'}</span></div>`,
+      drawCol: (g, d, cx, band, y, base, isLast) => {
+        const w = Math.min(36, band * 0.6);
+        const top = y(d.total);
+        if (d.total > 0) g.appendChild(svg('path', { d: topRound(cx - w / 2, top, w, base - top, 4), fill: VALUE_COLOR }));
+        if (isLast) {
+          const t = svg('text', { class: 'val', x: cx, y: top - 6, 'text-anchor': 'middle' });
+          t.textContent = money(d.total).replace(/,00$/, '');
+          g.appendChild(t);
+        }
+      }
+    });
+
+    /* 2) Quantidades — cigarros (coluna própria) + bebidas empilhadas por tipo */
+    const qMaxRaw = Math.max(...data.map(d => Math.max(d.drinks, d.cigs)));
+    const qMax = Math.max(2, Math.ceil(niceMax(qMaxRaw) / 2) * 2);
+    drawChart($('chartQty'), data, {
+      yMax: qMax,
+      yFmt: v => String(Math.round(v)),
+      ariaLabel: `Bebidas por tipo e cigarros por noite, ${data.length} noites. Detalhes na tabela abaixo.`,
+      tipHtml: d => `<b>${dFmt.format(nightDate(d))}</b>` +
+        [...STACK.map(x => [x, d.items[x.id] || 0]), ...(d.unknown ? [[UNKNOWN, d.unknown]] : []), [CIG, d.cigs]]
+          .map(([x, q]) => `<div class="row"><span><i style="background:${x.color}"></i>${x.label}</span><span>${q}</span></div>`).join('') +
+        `<div class="row"><span>Total de bebidas</span><span>${d.drinks}</span></div>`,
+      drawCol: (g, d, cx, band, y, base) => {
+        const w = Math.min(22, band * 0.32);
+        const gap = 2;
+        /* coluna de cigarros à esquerda */
+        if (d.cigs > 0) g.appendChild(svg('path', { d: topRound(cx - w - gap / 2, y(d.cigs), w, base - y(d.cigs), 4), fill: CIG.color }));
+        /* pilha de bebidas à direita, com 2px de respiro entre segmentos */
+        const segs = [...STACK.map(x => [x, d.items[x.id] || 0]), [UNKNOWN, d.unknown]].filter(([, q]) => q > 0);
+        let acc = 0;
+        segs.forEach(([x, q], k) => {
+          const y0 = y(acc), y1 = y(acc + q);
+          const hgt = Math.max(1, y0 - y1 - (k > 0 ? gap : 0));
+          const yy = y1;
+          const isTop = k === segs.length - 1;
+          g.appendChild(isTop
+            ? svg('path', { d: topRound(cx + gap / 2, yy, w, hgt, 4), fill: x.color })
+            : svg('rect', { x: cx + gap / 2, y: yy, width: w, height: hgt, fill: x.color }));
+          acc += q;
+        });
+      }
+    });
+
+    /* Tabela acessível */
+    const head = `<thead><tr><th scope="col">Noite</th><th scope="col">Total</th>${STACK.map(x => `<th scope="col">${x.label}</th>`).join('')}<th scope="col">Cigarros</th></tr></thead>`;
+    const body = [...data].reverse().map(d =>
+      `<tr><td>${dFmt.format(nightDate(d))}</td><td>${money(d.total)}</td>${STACK.map(x => `<td>${d.items[x.id] || 0}</td>`).join('')}<td>${d.cigs}</td></tr>`).join('');
+    $('dataTable').innerHTML = head + `<tbody>${body}</tbody>`;
+  }
+
+  document.addEventListener('click', () => { if (activeTip) hideTips(); });
+  let rT;
+  window.addEventListener('resize', () => {
+    clearTimeout(rT);
+    rT = setTimeout(() => { if (!$('panel-hist').hidden) renderCharts(); }, 150);
+  });
+
+  /* ---------- Data do header: atualiza sozinha ---------- */
+  function updateToday() {
+    const t = longD.format(new Date());
+    $('todayLabel').textContent = t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  setInterval(updateToday, 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) updateToday(); });
+
+  /* ---------- Init ---------- */
+  const s = load();
+  updateToday();
+  buildItems();
+
+  $('serviceToggle').addEventListener('click', toggleService);
+  $('nextAdd').addEventListener('click', () => inc(CYCLE[s.next]));
+  $('nextSkip').addEventListener('click', skip);
+  $('closeNight').addEventListener('click', closeNight);
+  $('exportBtn').addEventListener('click', exportJSON);
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) importJSON(f);
+    e.target.value = '';
+  });
+
+  // Sincroniza se o app estiver aberto em duas abas
+  window.addEventListener('storage', e => { if (e.key === KEY) location.reload(); });
+
+  render();
+  persist(); // testa o storage logo na abertura
+  refreshExportHint();
+  hydrateFromHistorico();
+})();
+</script>
+</body>
+</html>

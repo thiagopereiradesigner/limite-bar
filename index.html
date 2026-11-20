@@ -193,6 +193,26 @@
   .btn.danger{border-color:var(--danger);color:var(--danger);background:transparent}
   .btn.block{width:100%}
   .btn:active{transform:scale(.98)}
+  .start{margin:0 0 10px}
+  .start-btn{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    background:transparent;border-color:var(--muted);color:var(--text);font-weight:600;
+  }
+  .start-btn[hidden]{display:none}
+  .play{
+    width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;
+    border-color:transparent transparent transparent currentColor;
+  }
+  .started{
+    display:grid;grid-template-columns:auto 1fr auto;column-gap:10px;row-gap:2px;align-items:center;
+    min-height:var(--tap);padding:8px 14px;background:transparent;
+    border:2px solid var(--border);border-radius:12px;
+  }
+  .started[hidden]{display:none}
+  .started .play{grid-row:1 / span 2}
+  .started-label{margin:0;font-size:.85rem;font-weight:600;color:var(--muted)}
+  .started-time{margin:0;font-size:1.05rem;font-weight:800}
+  .started-day{grid-column:2 / span 2;margin:0;font-size:.8rem;color:var(--muted)}
 
   /* ---------- Cards ---------- */
   .section-title{font-size:1rem;color:var(--muted);font-weight:600;margin:20px 0 10px}
@@ -320,6 +340,18 @@
   <section id="panel-noite" role="tabpanel" aria-labelledby="tab-noite">
   <!-- Resumo -->
   <section class="summary" aria-label="Resumo da conta">
+    <div class="start">
+      <button type="button" class="btn block start-btn" id="startNight">
+        <span class="play" aria-hidden="true"></span>
+        Começar a bagunça
+      </button>
+      <div class="started" id="startedLine" hidden tabindex="-1" role="status">
+        <span class="play" aria-hidden="true"></span>
+        <p class="started-label">Bagunça desde</p>
+        <p class="started-time num" id="startedTime">—</p>
+        <p class="started-day" id="startedDay"></p>
+      </div>
+    </div>
     <div class="summary-card">
       <div class="summary-top">
         <div aria-live="polite" aria-atomic="true">
@@ -452,7 +484,8 @@
   const dFmt = new Intl.DateTimeFormat('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' });
   const shortD = new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit' });
   const longD = new Intl.DateTimeFormat('pt-BR', { weekday:'long', day:'numeric', month:'long' });
-  /* A "data da noite" é a do primeiro item pedido: quem fecha depois da meia-noite não troca de dia */
+  const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  /* A data da noite é o começo (botão ou primeiro item): quem fecha depois da meia-noite não troca de dia */
   const nightDate = h => new Date(h.startedAt || h.date);
 
   /* ---------- Estado + storage ---------- */
@@ -623,6 +656,14 @@
   }
 
   /* ---------- Ações ---------- */
+  function startNight() {
+    if (s.startedAt) return;
+    s.startedAt = new Date().toISOString();
+    buzz(); persist(); render();
+    toast('Bagunça começou');
+    $('startedLine').focus();
+  }
+
   function inc(id) {
     s.counts[id]++;
     if (!s.startedAt) s.startedAt = new Date().toISOString();
@@ -979,6 +1020,7 @@
     $('serviceToggle').setAttribute('aria-checked', String(s.service));
     $('drinkCount').textContent = t.drinks;
     $('cigCount').textContent = t.cigs;
+    renderStarted();
 
     const nextId = CYCLE[s.next];
     const next = BY_ID[nextId];
@@ -999,6 +1041,17 @@
 
     renderHistory();
     if (!$('panel-hist').hidden) renderCharts();
+  }
+
+  function renderStarted() {
+    const d = s.startedAt ? new Date(s.startedAt) : null;
+    const on = !!(d && !isNaN(d));
+    $('startNight').hidden = on;
+    $('startedLine').hidden = !on;
+    if (!on) return;
+    $('startedTime').textContent = timeFmt.format(d);
+    const day = longD.format(d);
+    $('startedDay').textContent = day.charAt(0).toUpperCase() + day.slice(1);
   }
 
   function renderHistory() {
@@ -1034,7 +1087,8 @@
 
       const meta = document.createElement('div');
       meta.className = 'h-meta num';
-      meta.textContent =
+      const began = h.startedAt ? `Começou às ${timeFmt.format(nightDate(h))} · ` : '';
+      meta.textContent = began +
         `Subtotal ${money(h.subtotal)} · ${h.service ? `com 10% (${money(h.serviceValue)})` : 'sem 10%'}` +
         ` · 🍹 ${h.drinks} bebida(s) · 🚬 ${h.cigs} cigarro(s)`;
 
@@ -1284,6 +1338,7 @@
   $('serviceToggle').addEventListener('click', toggleService);
   $('nextAdd').addEventListener('click', () => inc(CYCLE[s.next]));
   $('nextSkip').addEventListener('click', skip);
+  $('startNight').addEventListener('click', startNight);
   $('closeNight').addEventListener('click', closeNight);
   $('exportBtn').addEventListener('click', exportJSON);
   $('importBtn').addEventListener('click', () => $('importFile').click());
